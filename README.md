@@ -1,80 +1,60 @@
 # LinkedIn Scraper Chrome Extension
 
-This project is a simple LinkedIn scraper implemented as a Chrome Extension using Golang, Goquery, and MongoDB. It allows you to scrape LinkedIn profiles and store the information in a MongoDB database.
+This Chrome Extension allows you to scrape LinkedIn profiles and display a visual alert based on the API response from a Golang backend server.
 
-## Table of Contents
+## Features
 
-- [Prerequisites](#prerequisites)
-- [Installation](#installation)
-- [Usage](#usage)
-- [Project Structure](#project-structure)
-- [Contributing](#contributing)
-- [License](#license)
+- Scrapes LinkedIn profiles on the LinkedIn people listing page.
+- Calls a Golang API to get profile information for each person listed.
+- Displays a red visual alert for a 404 response and a green one for a 200 response.
 
-## Prerequisites
+## Setup
 
-Before you begin, ensure you have the following installed:
-
-- [Golang](https://golang.org/doc/install)
-- [MongoDB](https://docs.mongodb.com/manual/installation/)
-- [Google Chrome Browser](https://www.google.com/chrome/)
-
-## Installation
+### Golang Backend
 
 1. Clone the repository:
 
-   ```
-   git clone https://github.com/your-username/linkedin-scraper-chrome-extension.git
+   ```bash
+   git clone <repository-url>
+   cd linkedin-scraper
 
-   ```
+2. Install necessary Golang packages:
 
-2. Install the necessary Golang packages:
+    ```
+    go get github.com/PuerkitoBio/goquery
+    go get github.com/gorilla/mux
+    go get github.com/rs/cors
+    ```
 
-```
-go get github.com/go-chi/chi
-go get github.com/PuerkitoBio/goquery
-go get gopkg.in/mgo.v2
+3. Run the Golang server:
 
-```
+    ```go run main.go```
 
-3. Set up MongoDB and create a database named `linkedin_scraper`
+# Chrome Extension
 
-4. Modify the MongoDB connection string in `main.go` based on your setup:
+a. Open Chrome and go to ```chrome://extensions/```.
 
-```
+b. Enable "Developer mode" in the top-right corner.
 
-session, err := mgo.Dial("mongodb://localhost:27017/linkedin_scraper")
+c. Click "Load unpacked" and select the folder containing your extension files.
 
-```
-
-5. Run the Golang server:
-
-```
-go run main.go
-
-```
-
-6. Load the Chrome Extension:
-
-    - Open Chrome and navigate to chrome://extensions/.
-    - Enable "Developer mode."
-    - Click "Load unpacked" and select the folder containing your extension files.
+d. The extension icon should appear in the Chrome toolbar.
 
 # Usage
 
-1. Open a new tab and navigate to a LinkedIn profile (e.g., https://www.linkedin.com/in/username).
-2. Click on the extension icon in the Chrome toolbar.
-3. Click the "Scrape Profile" button to scrape the LinkedIn profile.
-4. The scraped information will be displayed in the extension popup.
+a. Open a new tab and navigate to LinkedIn.
 
-# Project Setup
+b. Click on the LinkedIn Scraper extension icon in the toolbar.
 
-`main.go`: Golang server implementation using Chi router, Goquery for scraping, and MongoDB for data storage.
-`manifest.json`: Chrome Extension manifest file.
-`popup.html`: HTML file for the extension popup.
-`popup.js`: JavaScript file for handling extension popup behavior.
-`background.js`: JavaScript file for background processes.
-`content.js`: JavaScript file injected into web pages for content script.
+c. Click the "Scrape LinkedIn" button.
+
+d. The extension will scrape LinkedIn profiles and display a visual alert based on the API response.
+
+# Troubleshooting
+
+a. If you encounter CORS issues, make sure your Golang server includes the necessary CORS headers. Check the Golang server logs and Chrome DevTools for more information.
+
+b. For any other issues, refer to the error messages in the browser console (Chrome DevTools) and the server logs for debugging.
 
 # License
 

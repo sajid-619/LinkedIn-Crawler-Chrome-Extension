@@ -8,121 +8,70 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/go-chi/chi"
-	"github.com/go-chi/chi/middleware"
 	"github.com/PuerkitoBio/goquery"
-	"gopkg.in/mgo.v2"
-	"gopkg.in/mgo.v2/bson"
+	"github.com/gorilla/mux"
+	"github.com/rs/cors"
 )
 
-// Profile represents the MongoDB document structure
-type Profile struct {
-	ID          bson.ObjectId `bson:"_id,omitempty"`
-	LinkedInURL string        `bson:"linkedin_url"`
-	Description string        `bson:"description"`
-}
+const linkedinURL = "https://www.linkedin.com/search/results/people/?heroEntityKey=urn%3Ali%3Aorganization%3A12577023&keywords=wivenn&origin=CLUSTER_EXPANSION&position=1&searchId=1ee62608-5740-4e35-92a3-f4c907067491&sid=VjS"
+const apiURL = "https://recrutador.wivenn.com.br/api/profileInfo/get?path="
 
-var session *mgo.Session
-var profilesCollection *mgo.Collection
-
-func init() {
-	var err error
-	// Update the MongoDB connection string based on your setup
-	session, err = mgo.Dial("mongodb://localhost:27017/linkedin_scraper")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// Set up the "profiles" collection in MongoDB
-	profilesCollection = session.DB("linkedin-scraper").C("profiles")
+type APIResponse struct {
+	Description string `json:"description"`
 }
 
 func main() {
-	r := chi.NewRouter()
 
-	r.Use(middleware.Logger)
-	r.Use(middleware.Recoverer)
+	// Create a new CORS middleware
+	c := cors.New(cors.Options{
+		AllowedOrigins: []string{"*"}, // You might want to restrict this to specific origins in a production environment
+		AllowedMethods: []string{"GET"},
+	 })
 
-	r.Get("/api/profileInfo/get", GetProfileInfo)
+	r := mux.NewRouter()
+	r.HandleFunc("/api/profileInfo/get", GetProfileInfo).Methods("GET")
 
-	http.ListenAndServe(":8080", r)
+	// Serve static files (your Chrome Extension files)
+	http.Handle("/", http.FileServer(http.Dir(".")))
+
+	// Start the server
+	port := ":8080"
+	fmt.Printf("Server running on port %s...\n", port)
+	log.Fatal(http.ListenAndServe(port, r))
 }
 
 func GetProfileInfo(w http.ResponseWriter, r *http.Request) {
-	path := r.URL.Query().Get("path")
-	if path == "" {
-		http.Error(w, "Path parameter is required", http.StatusBadRequest)
-		return
-	}
+	// Extract the dynamic user URI from the query parameters
+	userURI := r.URL.Query().Get("path")
 
-	// Check if the profile is already in the database
-	existingProfile, err := getProfileFromDatabase(path)
+	// Construct the LinkedIn profile URL
+	linkedinProfileURL := linkedinURL + userURI
+
+	// Scrape the LinkedIn profile page
+	description, err := scrapeLinkedInProfile(linkedinProfileURL)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Error checking existing profile: %s", err), http.StatusInternalServerError)
+		// Handle error (e.g., 404 not found)
+		w.WriteHeader(http.StatusNotFound)
 		return
 	}
 
-	if existingProfile != nil {
-		// Profile already in the database, return the stored description
-		response := map[string]string{"description": existingProfile.Description}
-		json.NewEncoder(w).Encode(response)
-		return
-	}
-
-	// Get LinkedIn profile information
-	description, err := ScrapeLinkedInProfile(path)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("Error scraping LinkedIn: %s", err), http.StatusInternalServerError)
-		return
-	}
-
-	// Save the new profile to the database
-	err = saveProfileToDatabase(path, description)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("Error saving profile to database: %s", err), http.StatusInternalServerError)
-		return
-	}
-
-	// Return JSON response
-	response := map[string]string{"description": description}
+	// Return the description in JSON format
+	response := APIResponse{Description: description}
 	json.NewEncoder(w).Encode(response)
 }
 
-func ScrapeLinkedInProfile(path string) (string, error) {
-	// Assuming LinkedIn URL is in the format "/in/dev-mirian-quispe/"
-	// Modify as needed based on your actual URL format
-	url := "https://www.linkedin.com" + path
-
-	// Use Goquery to scrape LinkedIn profile
+func scrapeLinkedInProfile(url string) (string, error) {
+	// Fetch the HTML content of the LinkedIn profile page
 	doc, err := goquery.NewDocument(url)
 	if err != nil {
 		return "", err
 	}
 
-	// Modify the CSS selector based on your actual requirement
+	// Find and extract the description using the specified CSS selector
 	description := doc.Find("div.entity-result__primary-subtitle.t-14.t-black.t-normal").Text()
 
-	return strings.TrimSpace(description), nil
-}
+	// Trim spaces and newlines from the description
+	description = strings.TrimSpace(description)
 
-func getProfileFromDatabase(path string) (*Profile, error) {
-	var profile Profile
-	err := profilesCollection.Find(bson.M{"linkedin_url": path}).One(&profile)
-	if err != nil && err != mgo.ErrNotFound {
-		return nil, err
-	}
-	if err == mgo.ErrNotFound {
-		return nil, nil
-	}
-	return &profile, nil
-}
-
-func saveProfileToDatabase(path, description string) error {
-	profile := Profile{
-		LinkedInURL: path,
-		Description: description,
-	}
-
-	err := profilesCollection.Insert(profile)
-	return err
+	return description, nil
 }
